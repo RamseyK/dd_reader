@@ -1,0 +1,14 @@
+dd_reader
+Ramsey Kant
+
+dd_reader is a raw Disk Image parser that can populate and display common data structures present on physical storage media.
+
+Supported Structures:
+MBR
+FAT12 / FAT16B / FAT32
+NTFS (work in progress)
+
+Usage:
+
+License:
+See LICENSE.TXT
