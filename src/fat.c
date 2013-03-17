@@ -1,3 +1,21 @@
+/**
+   dd_reader
+   fat.c
+   Copyright 2013 Ramsey Kant
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+
 #include "fat.h"
 
 fat_partition *fat_new_partition(uint8_t type) {
@@ -20,7 +38,7 @@ void fat_free_partition(fat_partition *part) {
 }
 
 void fat_read_partition(byte_buffer *bb, fat_partition *part) {
-
+	fat_read_boot_sector(bb, part);
 }
 
 void fat_write_partition(byte_buffer *bb, fat_partition *part) {
@@ -28,10 +46,50 @@ void fat_write_partition(byte_buffer *bb, fat_partition *part) {
 }
 
 void fat_print_partition(fat_partition *part, bool verbose) {
-	printf("==================================================\n");
-	print_ascii(part->boot_sector->oem_id, 8);
-	printf("\n");
-	printf("==================================================\n");
+	if(verbose) {
+		printf("Boot Sector:\n");
+		printf("OEM ID: ");
+		print_ascii(part->boot_sector->oem_id, sizeof(part->boot_sector->oem_id));
+		printf("\n");
+		printf("BIOS Parameter Block:\n");
+		printf("Bytes per Sector: %u\n", part->boot_sector->bpb.bytes_per_sector);
+		printf("Sectors per Cluster: %u\n", part->boot_sector->bpb.sectors_per_cluster);
+		printf("Reserved Sectors: %u\n", part->boot_sector->bpb.reserved_sectors);
+		printf("Number of FATs: %u\n", part->boot_sector->bpb.num_fats);
+		printf("Root Entries (F16): %u\n", part->boot_sector->bpb.root_entries_f16);
+		printf("Total Sectors (16 bit): %u\n", part->boot_sector->bpb.total_sectors_16bit);
+		printf("Media: 0x%02x\n", part->boot_sector->bpb.media_descriptor);
+		printf("Sectors per FAT (F16): %u\n", part->boot_sector->bpb.sectors_per_fat_f16);
+		printf("Sectors per Track: %u\n", part->boot_sector->bpb.sectors_per_track);
+		printf("Number of Heads: %u\n", part->boot_sector->bpb.num_heads);
+		printf("Hidden Sectors: %u\n", part->boot_sector->bpb.hidden_sectors);
+		printf("Total Sectors (32 bit): %u\n", part->boot_sector->bpb.total_sectors_32bit);
+		// FAT32 portion of the BPB
+		if(part->type == PT_FAT32) {
+			printf("Sectors per FAT (F32): %u\n", part->boot_sector->bpb.sectors_per_fat_f32);
+			printf("Flags (F32): %u\n", part->boot_sector->bpb.eflags_f32);
+			printf("Version (F32): %u\n", part->boot_sector->bpb.version_f32);
+			printf("Root Cluster (F32): %u\n", part->boot_sector->bpb.root_cluster_f32);
+			printf("FSINFO Sector (F32): %u\n", part->boot_sector->bpb.fsinfo_sector_f32);
+			printf("Backup Sector (F32): %u\n", part->boot_sector->bpb.backup_sector_f32);
+			printf("Reserved (should all be 0): ");
+			print_hex2(part->boot_sector->bpb.reserved_f32, sizeof(part->boot_sector->bpb.reserved_f32));
+		}
+
+		printf("\nExtended BIOS Parameter Block:\n");
+		printf("Physical Drive Num: %u\n", part->boot_sector->ebpb.physical_drive_num);
+		printf("Reserved (should be 0): %u\n", part->boot_sector->ebpb.reserved);
+		printf("Signature: 0x%X\n", part->boot_sector->ebpb.eb_sig);
+		printf("Volume Serial: 0x%X\n", part->boot_sector->ebpb.volume_serial);
+		printf("Volume Label: ");
+		print_ascii(part->boot_sector->ebpb.volume_label, sizeof(part->boot_sector->ebpb.volume_label));
+		printf("\n");
+		printf("System ID: ");
+		print_ascii(part->boot_sector->ebpb.system_id, sizeof(part->boot_sector->ebpb.system_id));
+		printf("\n");
+	} else {
+
+	}
 }
 
 fat_bs *fat_new_boot_sector() {
@@ -56,9 +114,7 @@ void fat_read_boot_sector(byte_buffer *bb, fat_partition *part) {
 	fat_bs *bs = part->boot_sector;
 
 	// Jump instruction
-	bs->jmp[0] = bb_get(bb);
-	bs->jmp[1] = bb_get(bb);
-	bs->jmp[2] = bb_get(bb);
+	bb_get_bytes_in(bb, sizeof(bs->jmp), bs->jmp);
 
 	// OEM ID string
 	bb_get_bytes_in(bb, sizeof(bs->oem_id), bs->oem_id);
@@ -69,15 +125,16 @@ void fat_read_boot_sector(byte_buffer *bb, fat_partition *part) {
 	bs->bpb.reserved_sectors = bb_get_short(bb);
 	bs->bpb.num_fats = bb_get(bb);
 	bs->bpb.root_entries_f16 = bb_get_short(bb);
-	bs->bpb.total_sectors_f16 = bb_get_short(bb);
+	bs->bpb.total_sectors_16bit = bb_get_short(bb);
 	bs->bpb.media_descriptor = bb_get(bb);
 	bs->bpb.sectors_per_fat_f16 = bb_get_short(bb);
 	bs->bpb.sectors_per_track = bb_get_short(bb);
 	bs->bpb.num_heads = bb_get_short(bb);
 	bs->bpb.hidden_sectors = bb_get_int(bb);
+	bs->bpb.total_sectors_32bit = bb_get_int(bb);
 	// FAT32 portion of the BPB
 	if(part->type == PT_FAT32) {
-		bs->bpb.total_sectors_f32 = bb_get_int(bb);
+		bs->bpb.sectors_per_fat_f32 = bb_get_int(bb);
 		bs->bpb.eflags_f32 = bb_get_short(bb);
 		bs->bpb.version_f32 = bb_get_short(bb);
 		bs->bpb.root_cluster_f32 = bb_get_int(bb);
@@ -108,7 +165,7 @@ void fat_read_boot_sector(byte_buffer *bb, fat_partition *part) {
 	bs->sig_end1 = bb_get(bb);
 	bs->sig_end2 = bb_get(bb);
 	if(bs->sig_end1 != 0x55 || bs->sig_end2 != 0xAA) {
-		printf("Warning: FAT VBR boot signature does not match 0x55 0xAA!\n");
+		printf("Warning: FAT VBR boot signature does not match 0x55 0xAA!. sig1: %X, sig2: %X\n", bs->sig_end1, bs->sig_end2);
 	}
 }
 

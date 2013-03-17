@@ -1,3 +1,21 @@
+/**
+   ByteBuffer (C implementation)
+   bytebuffer.c
+   Copyright 2011-2013 Ramsey Kant
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+
 #include "bytebuffer.h"
 
 // Wrap around an existing buf - will not copy buf
@@ -34,8 +52,8 @@ byte_buffer *bb_new_default() {
 	byte_buffer *bb = (byte_buffer*)malloc(sizeof(byte_buffer));
 	bb->pos = 0;
 	bb->wrapped = false;
-	bb->len = DEFAULT_SIZE;
-	bb->buf = (uint8_t*)calloc(DEFAULT_SIZE, sizeof(uint8_t));
+	bb->len = BB_DEFAULT_SIZE;
+	bb->buf = (uint8_t*)calloc(BB_DEFAULT_SIZE, sizeof(uint8_t));
 	return bb;
 }
 
@@ -77,7 +95,7 @@ void bb_skip(byte_buffer *bb, size_t len) {
 
 // Number of bytes from the current read position till the end of the buffer
 size_t bb_bytes_left(byte_buffer *bb) {
-	return bb->len - (bb->pos + 1);
+	return bb->len - bb->pos;
 }
 
 // Blank out the buffer and reset the position

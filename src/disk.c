@@ -1,3 +1,21 @@
+/**
+   dd_reader
+   disk.c
+   Copyright 2013 Ramsey Kant
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+
 #include "disk.h"
 
 /*
@@ -127,7 +145,8 @@ void disk_parse(disk_img *disk) {
 			disk->partition[i] = fat_new_partition(part_type);
 
 			// Move byte buffer position to the starting posititon of the partition
-			disk->buffer->pos = disk->master_boot_record->pentry[i].relative_sector;
+			// Calculate this by multiplying the relative sector by 512 (default bytes per sector)
+			disk->buffer->pos = disk->master_boot_record->pentry[i].relative_sector * 512;
 
 			fat_read_partition(disk->buffer, (fat_partition*)(disk->partition[i]));
 		} else {
@@ -144,7 +163,7 @@ void disk_print(disk_img *disk, bool verbose) {
 	printf("\n");*/
 
 	printf("MBR ANALYSIS\n");
-	mbr_print(disk->master_boot_record, false);
+	mbr_print(disk->master_boot_record, verbose);
 	printf("\n");
 
 	printf("VBR ANALYSIS\n");
@@ -152,11 +171,18 @@ void disk_print(disk_img *disk, bool verbose) {
 	for(int i = 0; i < 4; i++) {
 		part_type = disk->master_boot_record->pentry[i].type;
 
+		printf("==================================================\n");
+		char *type_str = mbr_get_partition_str(part_type);
+		printf("Partition %i (%s):\n", i, type_str);
+		free(type_str);
+
 		if(part_type == PT_FAT12 || part_type == PT_FAT16B || part_type == PT_FAT32) {
 			fat_print_partition((fat_partition*)(disk->partition[i]), verbose);
 		} else {
 			printf("Printing for this volume type not yet supported");
 		}
+
+		printf("==================================================\n\n");
 	}
 }
 

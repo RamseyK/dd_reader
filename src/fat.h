@@ -1,8 +1,27 @@
+/**
+   dd_reader
+   fat.h
+   Copyright 2013 Ramsey Kant
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+
 #ifndef _FAT_H_
 #define _FAT_H_
 
 #include "bytebuffer.h"
 #include "shared.h"
+#include "mbr.h"
 
 #define FAT16_BOOTSTRAP_SIZE 448
 #define FAT32_BOOTSTRAP_SIZE 420
@@ -27,8 +46,8 @@ typedef struct fat_bpb_t {
 	// FAT12/16: # of 32 byte directory entries (512 default). FAT32: 0, Unused
 	uint16_t root_entries_f16;
 
-	// FAT12/16: Total # of sectors on volume. FAT32: 0, Unused
-	uint16_t total_sectors_f16;
+	// FAT12/16: Total # of sectors on volume. If 0, total_sectors_32 is used. FAT32: 0, Unused
+	uint16_t total_sectors_16bit;
 
 	// Media type. 0xF8 (non removable)
 	uint8_t media_descriptor;
@@ -42,12 +61,15 @@ typedef struct fat_bpb_t {
 	// Count of hidden sectors preceeding the partition that contains this FAT volume
 	uint32_t hidden_sectors;
 
+	// FAT12/16: If total_sectors_16 is 0, this must be set. FAT32: Must be set. Total # of sectors on volume.
+	uint32_t total_sectors_32bit;
+
 	///
 	// FAT32 specific
 	///
 
 	// Number of sectors occupied by one FAT
-	uint32_t total_sectors_f32;
+	uint32_t sectors_per_fat_f32;
 
 	// Bits 0 - 3: Zero based number of active FAT. Bit 7: 0 = FAT is mirrored. 1 = One FAT is active
 	uint16_t eflags_f32;
