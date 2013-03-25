@@ -26,6 +26,7 @@
 
 /*
  * Partition Types
+ * See: http://www.win.tue.nl/~aeb/partitions/partition_types-1.html / https://en.wikipedia.org/wiki/Partition_type
  */
 #define PT_EMPTY 0x00
 #define PT_FAT12 0x01
@@ -33,6 +34,10 @@
 #define PT_FAT16B 0x06 // Over 32MB
 #define PT_NTFS 0x07
 #define PT_FAT32 0x0B
+
+/*
+ * Shared functions
+ */
 
 void print_ascii(unsigned char *buf, size_t len);
 void print_hex(unsigned char *buf, size_t len);

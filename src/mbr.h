@@ -49,9 +49,11 @@ typedef struct mbr_t {
 	uint8_t sig2;
 } mbr;
 
+
 /*
  * MBR functions
  */
+
 mbr *mbr_new();
 void mbr_free(mbr *m);
 char *mbr_get_partition_str(uint8_t type);

@@ -27,8 +27,10 @@ $(TARGET): $(OBJECTS)
 $(BUILDDIR)/%.o: $(SRCDIR)/%.$(SRCEXT)
 	@mkdir -p $(BUILDDIR)
 	@echo " CC $<"; $(CC) $(CFLAGS) -c -o $@ $<
+	
+all: $(TARGET)
  
 clean:
-	@echo " Cleaning..."; rm -r $(BUILDDIR) $(BINDIR)/$(TARGET)*
+	@echo " Cleaning..."; rm -rf $(BUILDDIR) $(BINDIR)/$(TARGET)* $(BINDIR)/*.out
  
-.PHONY: clean
+.PHONY: all clean

@@ -19,7 +19,11 @@
 #include "disk.h"
 
 /*
- * Initialize structures for analyzing a disk image
+ * Initialize structures for analyzing a disk image.
+ * Opens the specified image at path as read only and reads the data into the disk file buffer
+ *
+ * @param path Path to the disk image
+ * @return disk_img structure that represents the state of the opened disk image. NULL if unsuccessful
  */
 disk_img *disk_init(const char *path) {
 	struct stat sb;
@@ -31,14 +35,14 @@ disk_img *disk_init(const char *path) {
 	// Get the size of the disk image
 	if(stat(path, &sb) != 0) {
 		printf("Could not get the size of the disk image file %s\n", path);
-		exit(-1);
+		return NULL;
 	}
 
 	// Open disk image as read only
 	fp = fopen(path, "rb");
 	if(fp == NULL) {
 		printf("Could not open disk image file %s\n", path);
-		exit(-1);
+		return NULL;
 	}
 
 	// Read image data into the global buffer
@@ -50,7 +54,7 @@ disk_img *disk_init(const char *path) {
 
 	if(bytes_read != sb.st_size) {
 		printf("Incomplete read. Read %i out of %i bytes.\n", (int)bytes_read, (int)sb.st_size);
-		exit(-1);
+		return NULL;
 	}
 
 	// Wrap a byte buffer around the disk image buffer
@@ -60,8 +64,10 @@ disk_img *disk_init(const char *path) {
 }
 
 /*
- * Generate a SHA1 hash of the contents of the open disk image
- * and output the hash to a file
+ * Generate a SHA1 hash of the contents of the open disk image and output the hash to a file
+ *
+ * @param disk Disk Image state structure
+ * @param out_path File Path to output the SHA1 hash as plain text
  */
 void disk_output_sha1(disk_img *disk, const char *out_path) {
 	SHA1Context ctx;
@@ -69,7 +75,7 @@ void disk_output_sha1(disk_img *disk, const char *out_path) {
 	SHA1Input(&ctx, disk->file_buf, disk->file_size);
 	if(SHA1Result(&ctx) != 1) {
 		printf("Failed to generate SHA1 hash\n");
-		exit(-1);
+		return;
 	}
 
 	// Output to screen
@@ -78,9 +84,6 @@ void disk_output_sha1(disk_img *disk, const char *out_path) {
 	printf("\n");
 
 	// Output to file
-	if(out_path == NULL)
-		return;
-
 	FILE *fp = fopen(out_path, "w+");
 	if(fp == NULL) {
 		printf("Could not open file %s to write sha1 hash\n", out_path);
@@ -96,8 +99,10 @@ void disk_output_sha1(disk_img *disk, const char *out_path) {
 }
 
 /*
- * Generate a MD5 hash of the contents of the open disk image
- * and output the hash to a file
+ * Generate a MD5 hash of the contents of the open disk image and output the hash to a file
+ *
+ * @param disk Disk Image state structure
+ * @param out_path File Path to output the MD5 hash as plain text
  */
 void disk_output_md5(disk_img *disk, const char *out_path) {
 	unsigned char digest[16];
@@ -114,9 +119,6 @@ void disk_output_md5(disk_img *disk, const char *out_path) {
 	printf("\n");
 
 	// Output to file
-	if(out_path == NULL)
-		return;
-
 	FILE *fp = fopen(out_path, "w+");
 	if(fp == NULL) {
 		printf("Could not open file %s to write md5 hash\n", out_path);
@@ -131,6 +133,11 @@ void disk_output_md5(disk_img *disk, const char *out_path) {
 	fclose(fp);
 }
 
+/*
+ * Reads the entire disk image buffer and populates corresponding structures (MBR, File Systems)
+ *
+ * @param disk Disk Image state structure
+ */
 void disk_parse(disk_img *disk) {
 	// MBR
 	disk->master_boot_record = mbr_new();
@@ -155,6 +162,12 @@ void disk_parse(disk_img *disk) {
 	}
 }
 
+/*
+ * Outputs a human readable representation of the major data structures in the disk image
+ *
+ * @param disk Disk Image state structure
+ * @param verbose If true, display every field in every data structure. If false, only display major elements
+ */
 void disk_print(disk_img *disk, bool verbose) {
 	/*printf("CHECKSUMS\n");
 	printf("==================================================\n");
@@ -188,6 +201,8 @@ void disk_print(disk_img *disk, bool verbose) {
 
 /*
  * Release all resources related to the currently open disk image
+ *
+ * @param disk Disk Image state structure
  */
 void disk_destroy(disk_img *disk) {
 	if(disk->master_boot_record != NULL)

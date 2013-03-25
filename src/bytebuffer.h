@@ -29,8 +29,8 @@
 #define BB_DEFAULT_SIZE 4096
 
 typedef struct byte_buffer_t {
-	uint32_t pos; // Read/Write position
-	bool wrapped; // True if this byte buffer is a wrapping buf
+    uint32_t pos; // Read/Write position
+    bool wrapped; // True if this byte buffer is a wrapping buf
     size_t len; // Length of buf array
     uint8_t *buf;
 } byte_buffer;

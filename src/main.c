@@ -21,10 +21,28 @@
 #include "disk.h"
 #include "mbr.h"
 
+void print_help() {
+	printf("Usage: dd_reader [OPTIONS] FILE\n");
+	printf("FILE: Path to raw disk image dump\n");
+	printf("OPTIONS:\n");
+	printf("-h\tHelp. Display this message\n");
+	printf("-v\tVerbose. Print out all fields for all data structures\n");
+	printf("\n");
+}
+
 int main(int argc, char **argv) {
-	disk_img *disk = disk_init("/Users/ramseykant/TestImage1.img");
+	if(argc != 2) {
+		print_help();
+		return 0;
+	}
+
+	disk_img *disk = disk_init(argv[1]);
+	if(disk == NULL)
+		return -1;
+   
 	disk_parse(disk);
 	disk_print(disk, false);
 	disk_destroy(disk);
 	return 0;
 }
+

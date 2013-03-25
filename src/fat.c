@@ -18,6 +18,8 @@
 
 #include "fat.h"
 
+// Overall Partition
+
 fat_partition *fat_new_partition(uint8_t type) {
 	fat_partition *part = (fat_partition*)malloc(sizeof(fat_partition));
 	memset(part, 0, sizeof(fat_partition));
@@ -47,11 +49,11 @@ void fat_write_partition(byte_buffer *bb, fat_partition *part) {
 
 void fat_print_partition(fat_partition *part, bool verbose) {
 	if(verbose) {
-		printf("Boot Sector:\n");
+		printf("Boot Sector\n");
 		printf("OEM ID: ");
 		print_ascii(part->boot_sector->oem_id, sizeof(part->boot_sector->oem_id));
 		printf("\n");
-		printf("BIOS Parameter Block:\n");
+		printf("BIOS Parameter Block\n");
 		printf("Bytes per Sector: %u\n", part->boot_sector->bpb.bytes_per_sector);
 		printf("Sectors per Cluster: %u\n", part->boot_sector->bpb.sectors_per_cluster);
 		printf("Reserved Sectors: %u\n", part->boot_sector->bpb.reserved_sectors);
@@ -76,7 +78,7 @@ void fat_print_partition(fat_partition *part, bool verbose) {
 			print_hex2(part->boot_sector->bpb.reserved_f32, sizeof(part->boot_sector->bpb.reserved_f32));
 		}
 
-		printf("\nExtended BIOS Parameter Block:\n");
+		printf("\nExtended BIOS Parameter Block\n");
 		printf("Physical Drive Num: %u\n", part->boot_sector->ebpb.physical_drive_num);
 		printf("Reserved (should be 0): %u\n", part->boot_sector->ebpb.reserved);
 		printf("Signature: 0x%X\n", part->boot_sector->ebpb.eb_sig);
@@ -88,9 +90,48 @@ void fat_print_partition(fat_partition *part, bool verbose) {
 		print_ascii(part->boot_sector->ebpb.system_id, sizeof(part->boot_sector->ebpb.system_id));
 		printf("\n");
 	} else {
-
+		uint32_t fat_end_sector = fat_calc_fat_end_sector(part);
+		uint32_t sectors_per_fat = 0;
+		uint32_t data_start = fat_calc_data_start_sector(part);
+		if(part->type == PT_FAT32) {
+			sectors_per_fat = part->boot_sector->bpb.sectors_per_fat_f32;
+		} else {
+			sectors_per_fat = part->boot_sector->bpb.sectors_per_fat_f16;
+		}
+	
+		printf("Reserved Area:  Start sector: %i  Ending sector: %i  Size: %i sectors\n", 0, part->boot_sector->bpb.reserved_sectors-1, part->boot_sector->bpb.reserved_sectors);
+		printf("Sectors per cluster: %i sectors\n", part->boot_sector->bpb.sectors_per_cluster);
+		printf("FAT area: Start sector: %i  Ending sector: %i\n", part->boot_sector->bpb.reserved_sectors, fat_end_sector);
+		printf("# of FATs: %i\n", part->boot_sector->bpb.num_fats);
+		printf("The size of each FAT: %i sectors\n", sectors_per_fat);
+		printf("The first sector of cluster 2: %i sectors\n", data_start);
 	}
 }
+
+// Location calculation helper functions
+
+// Calculate the last sector of the FAT area
+uint32_t fat_calc_fat_end_sector(fat_partition *part) {
+	if(part->type == PT_FAT32)
+		return part->boot_sector->bpb.reserved_sectors+(part->boot_sector->bpb.sectors_per_fat_f32*part->boot_sector->bpb.num_fats) - 1;
+	else
+		return part->boot_sector->bpb.reserved_sectors+(part->boot_sector->bpb.sectors_per_fat_f16*part->boot_sector->bpb.num_fats) - 1;
+}
+
+// Calculate the size of the Root Directory
+uint32_t fat_calc_root_dir_size(fat_partition *part) {
+	if(part->type == PT_FAT32)
+		return 0;
+	
+	return (part->boot_sector->bpb.root_entries_f16 * 32) / part->boot_sector->bpb.bytes_per_sector;
+}
+
+// Calculate the first sector of the Data Region
+uint32_t fat_calc_data_start_sector(fat_partition *part) {
+	return fat_calc_fat_end_sector(part) + 1 + fat_calc_root_dir_size(part) + part->boot_sector->bpb.hidden_sectors; // +1 to move past the last fat_end_sector
+}
+
+// Reserved Sectors
 
 fat_bs *fat_new_boot_sector() {
 	fat_bs *bs = (fat_bs*)malloc(sizeof(fat_bs));
@@ -182,4 +223,12 @@ fat_fsinfo *fat_new_fsinfo() {
 
 void fat_free_fsinfo(fat_fsinfo *fsi) {
 	free(fsi);
+}
+
+void fat_read_fsinfo(byte_buffer *bb, fat_partition *part) {
+
+}
+
+void fat_write_fsinfo(byte_buffer *bb, fat_partition *part) {
+
 }

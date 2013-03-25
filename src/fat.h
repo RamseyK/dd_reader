@@ -37,7 +37,7 @@ typedef struct fat_bpb_t {
 	// Must not take on a value s.t. bytes_per_sector * sectors_per_cluster > 32K. 1,2,4,8,16,32,64,128
 	uint8_t sectors_per_cluster;
 
-	// Sectors to contain BS, FSINO, additional reserved sectors. 1 (FAT12/16), 32 (FAT32).
+	// Number of sectors to contain BS, FSINO, additional reserved sectors. Always starts at sector 0
 	uint16_t reserved_sectors;
 
 	// # of FATs (1 primary, 1 backup). Always 2
@@ -159,6 +159,11 @@ void fat_read_partition(byte_buffer *bb, fat_partition *part);
 void fat_write_partition(byte_buffer *bb, fat_partition *part);
 void fat_print_partition(fat_partition *part, bool verbose);
 
+// Location calculation helper functions
+uint32_t fat_calc_fat_end_sector(fat_partition *part);
+uint32_t fat_calc_root_dir_size(fat_partition *part);
+uint32_t fat_calc_data_start_sector(fat_partition *part);
+
 // Reserved Sectors
 fat_bs *fat_new_boot_sector();
 void fat_free_boot_sector(fat_bs *bs);
@@ -167,5 +172,8 @@ void fat_write_boot_sector(byte_buffer *bb, fat_partition *part);
 
 fat_fsinfo *fat_new_fsinfo();
 void fat_free_fsinfo(fat_fsinfo *fsi);
+void fat_read_fsinfo(byte_buffer *bb, fat_partition *part);
+void fat_write_fsinfo(byte_buffer *bb, fat_partition *part);
+
 
 #endif
