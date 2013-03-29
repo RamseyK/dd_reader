@@ -192,7 +192,7 @@ void disk_print(disk_img *disk, bool verbose) {
 		if(part_type == PT_FAT12 || part_type == PT_FAT16B || part_type == PT_FAT32) {
 			fat_print_partition((fat_partition*)(disk->partition[i]), verbose);
 		} else {
-			printf("Printing for this volume type not yet supported");
+			printf("Printing for this volume type not yet supported\n");
 		}
 
 		printf("==================================================\n\n");

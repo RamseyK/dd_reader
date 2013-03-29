@@ -41,7 +41,7 @@ int main(int argc, char **argv) {
 		return -1;
    
 	disk_parse(disk);
-	disk_print(disk, false);
+	disk_print(disk, true);
 	disk_destroy(disk);
 	return 0;
 }

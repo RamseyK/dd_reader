@@ -63,7 +63,7 @@ char *mbr_get_partition_str(uint8_t type) {
 
 void mbr_read(byte_buffer *bb, mbr *m) {
 	// +446 boot loader
-	bb_get_bytes_in(bb, sizeof(m->boot_ldr), m->boot_ldr);
+	bb_get_bytes_in(bb, m->boot_ldr, sizeof(m->boot_ldr));
 	
 	// Read 4 partition entries
 	partition_entry *pe;

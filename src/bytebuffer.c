@@ -164,13 +164,13 @@ uint8_t bb_get_at(byte_buffer *bb, uint32_t index) {
 	return bb->buf[index];
 }
 
-void bb_get_bytes_in(byte_buffer *bb, size_t len, uint8_t *dest) {
+void bb_get_bytes_in(byte_buffer *bb, uint8_t *dest, size_t len) {
 	for(size_t i = 0; i < len; i++) {
 		dest[i] = bb_get(bb);
 	}
 }
 
-void bb_get_bytes_at_in(byte_buffer *bb, size_t len, uint32_t index, uint8_t *dest) {
+void bb_get_bytes_at_in(byte_buffer *bb, uint32_t index, uint8_t *dest, size_t len) {
 	for(size_t i = 0; i < len; i++) {
 		dest[i] = bb_get_at(bb, index+i);
 	}

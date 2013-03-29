@@ -40,7 +40,22 @@ void fat_free_partition(fat_partition *part) {
 }
 
 void fat_read_partition(byte_buffer *bb, fat_partition *part) {
+	// Keep the byte address of the start of the partiton
+	int part_start_pos = bb->pos;
+
+	// Boot sector
 	fat_read_boot_sector(bb, part);
+	
+	// FAT32: Jump to FSINFO and read it
+	if(part->type == PT_FAT32) {
+		// Boot sector is always at sector 0 so skip to the relative sector offset of the FSINFO
+		// We subtract 1 from the fsinfo_sector to account for the boot sector ("first sector")
+		bb_skip(bb, part->boot_sector->bpb.bytes_per_sector * (part->boot_sector->bpb.fsinfo_sector_f32 - 1));
+		fat_read_fsinfo(bb, part);
+	}
+
+	// Move to the start of the FAT tables
+	bb->pos = part_start_pos + (part->boot_sector->bpb.reserved_sectors * part->boot_sector->bpb.bytes_per_sector);
 }
 
 void fat_write_partition(byte_buffer *bb, fat_partition *part) {
@@ -53,6 +68,7 @@ void fat_print_partition(fat_partition *part, bool verbose) {
 		printf("OEM ID: ");
 		print_ascii(part->boot_sector->oem_id, sizeof(part->boot_sector->oem_id));
 		printf("\n");
+		
 		printf("BIOS Parameter Block\n");
 		printf("Bytes per Sector: %u\n", part->boot_sector->bpb.bytes_per_sector);
 		printf("Sectors per Cluster: %u\n", part->boot_sector->bpb.sectors_per_cluster);
@@ -89,10 +105,14 @@ void fat_print_partition(fat_partition *part, bool verbose) {
 		printf("System ID: ");
 		print_ascii(part->boot_sector->ebpb.system_id, sizeof(part->boot_sector->ebpb.system_id));
 		printf("\n");
+		
+		if(part->type == PT_FAT32) {
+			printf("\nFSINFO\n");
+			printf("Free Cluster Count: %u\n", part->fsinfo->free_cluster_count);
+			printf("Next Free Cluster: %u\n", part->fsinfo->next_free_cluster);
+		}
 	} else {
-		uint32_t fat_end_sector = fat_calc_fat_end_sector(part);
 		uint32_t sectors_per_fat = 0;
-		uint32_t data_start = fat_calc_data_start_sector(part);
 		if(part->type == PT_FAT32) {
 			sectors_per_fat = part->boot_sector->bpb.sectors_per_fat_f32;
 		} else {
@@ -101,10 +121,10 @@ void fat_print_partition(fat_partition *part, bool verbose) {
 	
 		printf("Reserved Area:  Start sector: %i  Ending sector: %i  Size: %i sectors\n", 0, part->boot_sector->bpb.reserved_sectors-1, part->boot_sector->bpb.reserved_sectors);
 		printf("Sectors per cluster: %i sectors\n", part->boot_sector->bpb.sectors_per_cluster);
-		printf("FAT area: Start sector: %i  Ending sector: %i\n", part->boot_sector->bpb.reserved_sectors, fat_end_sector);
+		printf("FAT area: Start sector: %i  Ending sector: %i\n", part->boot_sector->bpb.reserved_sectors, fat_calc_fat_end_sector(part));
 		printf("# of FATs: %i\n", part->boot_sector->bpb.num_fats);
 		printf("The size of each FAT: %i sectors\n", sectors_per_fat);
-		printf("The first sector of cluster 2: %i sectors\n", data_start);
+		printf("The first sector of cluster 2: %i sectors\n", fat_calc_data_start_sector(part));
 	}
 }
 
@@ -155,10 +175,10 @@ void fat_read_boot_sector(byte_buffer *bb, fat_partition *part) {
 	fat_bs *bs = part->boot_sector;
 
 	// Jump instruction
-	bb_get_bytes_in(bb, sizeof(bs->jmp), bs->jmp);
+	bb_get_bytes_in(bb, bs->jmp, sizeof(bs->jmp));
 
 	// OEM ID string
-	bb_get_bytes_in(bb, sizeof(bs->oem_id), bs->oem_id);
+	bb_get_bytes_in(bb, bs->oem_id, sizeof(bs->oem_id));
 
 	// BPB
 	bs->bpb.bytes_per_sector = bb_get_short(bb);
@@ -189,17 +209,14 @@ void fat_read_boot_sector(byte_buffer *bb, fat_partition *part) {
 	bs->ebpb.reserved = bb_get(bb);
 	bs->ebpb.eb_sig = bb_get(bb);
 	bs->ebpb.volume_serial = bb_get_int(bb);
-	bb_get_bytes_in(bb, sizeof(bs->ebpb.volume_label), bs->ebpb.volume_label);
-	bb_get_bytes_in(bb, sizeof(bs->ebpb.system_id), bs->ebpb.system_id);
+	bb_get_bytes_in(bb, bs->ebpb.volume_label, sizeof(bs->ebpb.volume_label));
+	bb_get_bytes_in(bb, bs->ebpb.system_id, sizeof(bs->ebpb.system_id));
 
 	// Bootstrap code
-	if(part->type == PT_FAT12) {
-		bs->bootstrap_code = bb_get_bytes(bb, FAT16_BOOTSTRAP_SIZE);
-	} else if(part->type == PT_FAT16B) {
-		bs->bootstrap_code = bb_get_bytes(bb, FAT16_BOOTSTRAP_SIZE);
-	} else if(part->type == PT_FAT32) {
+	if(part->type == PT_FAT32) {
 		bs->bootstrap_code = bb_get_bytes(bb, FAT32_BOOTSTRAP_SIZE);
 	} else {
+		bs->bootstrap_code = bb_get_bytes(bb, FAT16_BOOTSTRAP_SIZE);
 	}
 
 	// End signature
@@ -225,8 +242,37 @@ void fat_free_fsinfo(fat_fsinfo *fsi) {
 	free(fsi);
 }
 
+/**
+ * Read the FSINFO sector (usually sector 1, after boot sector)
+ * FSINFO contains hint information for the operating system to reduce free space computation time or finding the next empty cluster for file writes
+ */
 void fat_read_fsinfo(byte_buffer *bb, fat_partition *part) {
-
+	part->fsinfo = fat_new_fsinfo();
+	fat_fsinfo *fsi = part->fsinfo;
+	
+	// Read the lead signature to validate this is an FSInfo sector
+	fsi->sig_begin = bb_get_int(bb);
+	if(fsi->sig_begin != 0x41615252) {
+		printf("Warning: FAT FSINFO lead signature does not match 0x41615252. sig_begin: 0x%X\n", fsi->sig_begin);
+	}
+	
+	bb_get_bytes_in(bb, fsi->reserved1, sizeof(fsi->reserved1));
+	
+	// Structure / Data area signature begin
+	fsi->sig_data_begin = bb_get_int(bb);
+	if(fsi->sig_data_begin != 0x61417272) {
+		printf("Warning: FAT FSINFO data signature does not match 0x61417272. sig_data_begin: 0x%X\n", fsi->sig_data_begin);
+	}
+	
+	fsi->free_cluster_count = bb_get_int(bb);
+	fsi->next_free_cluster = bb_get_int(bb);
+	bb_get_bytes_in(bb, fsi->reserved2, sizeof(fsi->reserved2));
+	
+	// End of FSINFO sector marker
+	fsi->sig_end = bb_get_int(bb);
+	if(fsi->sig_end != 0xAA550000) {
+		printf("Warning: FAT FSINFO end signature does not match 0xAA550000. sig_begin: 0x%X\n", fsi->sig_end);
+	}
 }
 
 void fat_write_fsinfo(byte_buffer *bb, fat_partition *part) {

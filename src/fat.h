@@ -118,6 +118,7 @@ typedef struct fat_boot_sector_t {
 
 /*
  * FAT File System Information Structure (FAT32 only)
+ * Located at fsinfo_sector_f32 from BPB (usually sector 1)
  */
 typedef struct fat_fsinfo_t {
 	uint32_t sig_begin; // 0x41615252 (little). (0x52 0x52 0x61 0x41 = "RRaA")
