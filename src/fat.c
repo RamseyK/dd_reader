@@ -20,11 +20,9 @@
 
 // Overall Partition
 
-fat_partition *fat_new_partition(uint8_t type) {
+fat_partition *fat_new_partition() {
 	fat_partition *part = (fat_partition*)malloc(sizeof(fat_partition));
 	memset(part, 0, sizeof(fat_partition));
-
-	part->type = type;
 
 	return part;
 }
@@ -82,6 +80,7 @@ void fat_print_partition(fat_partition *part, bool verbose) {
 		printf("Number of Heads: %u\n", part->boot_sector->bpb.num_heads);
 		printf("Hidden Sectors: %u\n", part->boot_sector->bpb.hidden_sectors);
 		printf("Total Sectors (32 bit): %u\n", part->boot_sector->bpb.total_sectors_32bit);
+
 		// FAT32 portion of the BPB
 		if(part->type == PT_FAT32) {
 			printf("Sectors per FAT (F32): %u\n", part->boot_sector->bpb.sectors_per_fat_f32);
@@ -111,44 +110,54 @@ void fat_print_partition(fat_partition *part, bool verbose) {
 			printf("Free Cluster Count: %u\n", part->fsinfo->free_cluster_count);
 			printf("Next Free Cluster: %u\n", part->fsinfo->next_free_cluster);
 		}
-	} else {
-		uint32_t sectors_per_fat = 0;
-		if(part->type == PT_FAT32) {
-			sectors_per_fat = part->boot_sector->bpb.sectors_per_fat_f32;
-		} else {
-			sectors_per_fat = part->boot_sector->bpb.sectors_per_fat_f16;
-		}
-	
-		printf("Reserved Area:  Start sector: %i  Ending sector: %i  Size: %i sectors\n", 0, part->boot_sector->bpb.reserved_sectors-1, part->boot_sector->bpb.reserved_sectors);
-		printf("Sectors per cluster: %i sectors\n", part->boot_sector->bpb.sectors_per_cluster);
-		printf("FAT area: Start sector: %i  Ending sector: %i\n", part->boot_sector->bpb.reserved_sectors, fat_calc_fat_end_sector(part));
-		printf("# of FATs: %i\n", part->boot_sector->bpb.num_fats);
-		printf("The size of each FAT: %i sectors\n", sectors_per_fat);
-		printf("The first sector of cluster 2: %i sectors\n", fat_calc_data_start_sector(part));
 	}
+
+	printf("\n");
+
+	// Normal output
+
+	printf("Reserved Area:  Start sector: %i  Ending sector: %i  Size: %i sectors\n", 0, part->boot_sector->bpb.reserved_sectors-1, part->boot_sector->bpb.reserved_sectors);
+	printf("Sectors per cluster: %i sectors\n", part->boot_sector->bpb.sectors_per_cluster);
+	printf("FAT area: Start sector: %i  Ending sector: %i\n", part->boot_sector->bpb.reserved_sectors, fat_calc_data_start_sector(part)-1);
+	printf("# of FATs: %i\n", part->boot_sector->bpb.num_fats);
+	printf("The size of each FAT: %i sectors\n", fat_calc_sectors_per_fat(part));
+	printf("The first sector of cluster 2: %i sectors\n", fat_calc_data_start_sector(part));
 }
 
 // Location calculation helper functions
 
-// Calculate the last sector of the FAT area
-uint32_t fat_calc_fat_end_sector(fat_partition *part) {
-	if(part->type == PT_FAT32)
-		return part->boot_sector->bpb.reserved_sectors+(part->boot_sector->bpb.sectors_per_fat_f32*part->boot_sector->bpb.num_fats) - 1;
+// Return the specified sectors per fat from the BPB
+uint32_t fat_calc_sectors_per_fat(fat_partition *part) {
+	if(part->boot_sector->bpb.sectors_per_fat_f16 != 0)
+		return part->boot_sector->bpb.sectors_per_fat_f16;
 	else
-		return part->boot_sector->bpb.reserved_sectors+(part->boot_sector->bpb.sectors_per_fat_f16*part->boot_sector->bpb.num_fats) - 1;
+		return part->boot_sector->bpb.sectors_per_fat_f32;
 }
 
-// Calculate the size of the Root Directory
+// Calculate the size of the Root Directory in sectors relative to the BPB at sector 0
 uint32_t fat_calc_root_dir_size(fat_partition *part) {
-	if(part->type == PT_FAT32)
-		return 0;
-	
-	return (part->boot_sector->bpb.root_entries_f16 * 32) / part->boot_sector->bpb.bytes_per_sector;
+	return ceil((part->boot_sector->bpb.root_entries_f16 * 32) / part->boot_sector->bpb.bytes_per_sector);
 }
 
-// Calculate the first sector of the Data Region
+// Calculate the first sector of the Data Region relative to the BPB at sector 0
 uint32_t fat_calc_data_start_sector(fat_partition *part) {
-	return fat_calc_fat_end_sector(part) + 1 + fat_calc_root_dir_size(part) + part->boot_sector->bpb.hidden_sectors; // +1 to move past the last fat_end_sector
+	return part->boot_sector->bpb.reserved_sectors + (fat_calc_sectors_per_fat(part) * part->boot_sector->bpb.num_fats) + fat_calc_root_dir_size(part);
+}
+
+// Calculate the size of the Data Region in sectors relative to the BPB at sector 0
+uint32_t fat_calc_data_size(fat_partition *part) {
+	uint32_t total_sectors = 0;
+
+	if(part->boot_sector->bpb.total_sectors_16bit != 0)
+		total_sectors = part->boot_sector->bpb.total_sectors_16bit;
+	else
+		total_sectors = part->boot_sector->bpb.total_sectors_32bit;
+
+	return total_sectors - fat_calc_data_start_sector(part);
+}
+
+uint32_t fat_calc_count_clusters(fat_partition *part) {
+	return floor(fat_calc_data_size(part) / part->boot_sector->bpb.sectors_per_cluster);
 }
 
 // Reserved Sectors
@@ -193,6 +202,18 @@ void fat_read_boot_sector(byte_buffer *bb, fat_partition *part) {
 	bs->bpb.num_heads = bb_get_short(bb);
 	bs->bpb.hidden_sectors = bb_get_int(bb);
 	bs->bpb.total_sectors_32bit = bb_get_int(bb);
+
+	// Make proper determination of the FAT partition type according to MSFT docs
+	uint32_t cluster_count = fat_calc_count_clusters(part);
+	if(cluster_count < 4085) {
+		part->type = PT_FAT12;
+	} else if(cluster_count < 65525) {
+		part->type = PT_FAT16B;
+	} else {
+		part->type = PT_FAT32;
+	}
+	printf("Detected FAT type: %s\n", get_partition_str(part->type)); // delete this after testing
+
 	// FAT32 portion of the BPB
 	if(part->type == PT_FAT32) {
 		bs->bpb.sectors_per_fat_f32 = bb_get_int(bb);

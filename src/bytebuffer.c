@@ -48,6 +48,49 @@ byte_buffer *bb_new(size_t len) {
 	return bb;
 }
 
+byte_buffer *bb_new_from_file(const char *path, const char *fopen_opts, bool wrap) {
+	struct stat sb;
+	FILE *fp;
+	size_t bytes_read = 0;
+	uint8_t *file_buf = NULL;
+	byte_buffer *bb = NULL;
+
+	// Get the size of the file
+	if(stat(path, &sb) != 0) {
+		printf("Could not get the size of the disk image file %s\n", path);
+		return NULL;
+	}
+
+	// Open file as read only
+	fp = fopen(path, fopen_opts);
+	if(fp == NULL) {
+		printf("Could not open disk image file %s\n", path);
+		return NULL;
+	}
+
+	// Read data into a memory buffer
+	file_buf = (uint8_t*)malloc(sb.st_size);
+	bytes_read = fread(file_buf, sizeof(uint8_t), sb.st_size, fp);
+
+	fclose(fp);
+
+	if(bytes_read != sb.st_size) {
+		printf("Incomplete read. Read %i out of %i bytes.\n", (int)bytes_read, (int)sb.st_size);
+		free(file_buf);
+		return NULL;
+	}
+
+	if(wrap) {
+		bb = bb_new_wrap(file_buf, bytes_read);
+	} else {
+		bb = bb_new_copy(file_buf, bytes_read);
+	}
+
+	free(file_buf);
+
+	return bb;
+}
+
 byte_buffer *bb_new_default() {
 	byte_buffer *bb = (byte_buffer*)malloc(sizeof(byte_buffer));
 	bb->pos = 0;

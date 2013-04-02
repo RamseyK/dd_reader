@@ -29,38 +29,6 @@ void mbr_free(mbr *m) {
 	free(m);
 }
 
-char *mbr_get_partition_str(uint8_t type) {
-	char *str = (char*)calloc(128, sizeof(char));
-
-	switch(type) {
-		case PT_FAT12:
-			strcpy(str, "DOS 12-bit FAT");
-		break;
-
-		/*case PT_FAT16:
-			strcpy(str, "DOS 16-bit FAT for partitions smaller than 32 MB");
-		break;*/
-
-		case PT_FAT16B:
-			strcpy(str, "DOS 16-bit FAT for partitions larger than 32 MB");
-		break;
-
-		case PT_NTFS:
-			strcpy(str, "NTFS");
-		break;
-
-		case PT_FAT32:
-			strcpy(str, "DOS 32-bit FAT");
-		break;
-
-		default:
-			strcpy(str, "Unknown");
-		break;
-	}
-
-	return str;
-}
-
 void mbr_read(byte_buffer *bb, mbr *m) {
 	// +446 boot loader
 	bb_get_bytes_in(bb, m->boot_ldr, sizeof(m->boot_ldr));
@@ -111,7 +79,7 @@ void mbr_print(mbr* m, bool verbose) {
 	for(int i = 0; i < 4; i++) {
 		pe = &(m->pentry[i]);
 
-		part_str = mbr_get_partition_str(pe->type);
+		part_str = get_partition_str(pe->type);
 
 		// Verbose
 		if(verbose) {

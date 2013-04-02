@@ -26,39 +26,11 @@
  * @return disk_img structure that represents the state of the opened disk image. NULL if unsuccessful
  */
 disk_img *disk_init(const char *path) {
-	struct stat sb;
-	FILE *fp;
-	size_t bytes_read = 0;
 	disk_img *disk = (disk_img*)malloc(sizeof(disk_img));
 	memset(disk, 0, sizeof(disk_img));
 
-	// Get the size of the disk image
-	if(stat(path, &sb) != 0) {
-		printf("Could not get the size of the disk image file %s\n", path);
-		return NULL;
-	}
-
-	// Open disk image as read only
-	fp = fopen(path, "rb");
-	if(fp == NULL) {
-		printf("Could not open disk image file %s\n", path);
-		return NULL;
-	}
-
-	// Read image data into the global buffer
-	disk->file_size = sb.st_size;
-	disk->file_buf = (uint8_t*)malloc(disk->file_size);
-	bytes_read = fread(disk->file_buf, sizeof(uint8_t), disk->file_size, fp);
-
-	fclose(fp);
-
-	if(bytes_read != sb.st_size) {
-		printf("Incomplete read. Read %i out of %i bytes.\n", (int)bytes_read, (int)sb.st_size);
-		return NULL;
-	}
-
 	// Wrap a byte buffer around the disk image buffer
-	disk->buffer = bb_new_wrap(disk->file_buf, disk->file_size);
+	disk->buffer = bb_new_from_file(path, "rb", true);
 
 	return disk;
 }
@@ -72,7 +44,7 @@ disk_img *disk_init(const char *path) {
 void disk_output_sha1(disk_img *disk, const char *out_path) {
 	SHA1Context ctx;
 	SHA1Reset(&ctx);
-	SHA1Input(&ctx, disk->file_buf, disk->file_size);
+	SHA1Input(&ctx, disk->buffer->buf, disk->buffer->len);
 	if(SHA1Result(&ctx) != 1) {
 		printf("Failed to generate SHA1 hash\n");
 		return;
@@ -110,7 +82,7 @@ void disk_output_md5(disk_img *disk, const char *out_path) {
 
 	MD5_CTX ctx;
 	MD5_Init(&ctx);
-	MD5_Update(&ctx, disk->file_buf, disk->file_size);
+	MD5_Update(&ctx, disk->buffer->buf, disk->buffer->len);
 	MD5_Final(digest, &ctx);
 
 	// Output to screen
@@ -149,7 +121,7 @@ void disk_parse(disk_img *disk) {
 		part_type = disk->master_boot_record->pentry[i].type;
 
 		if(part_type == PT_FAT12 || part_type == PT_FAT16B || part_type == PT_FAT32) {
-			disk->partition[i] = fat_new_partition(part_type);
+			disk->partition[i] = fat_new_partition();
 
 			// Move byte buffer position to the starting posititon of the partition
 			// Calculate this by multiplying the relative sector by 512 (default bytes per sector)
@@ -185,7 +157,7 @@ void disk_print(disk_img *disk, bool verbose) {
 		part_type = disk->master_boot_record->pentry[i].type;
 
 		printf("==================================================\n");
-		char *type_str = mbr_get_partition_str(part_type);
+		char *type_str = get_partition_str(part_type);
 		printf("Partition %i (%s):\n", i, type_str);
 		free(type_str);
 
@@ -216,7 +188,4 @@ void disk_destroy(disk_img *disk) {
 			fat_free_partition((fat_partition*)(disk->partition[i]));
 		}
 	}
-
-	disk->file_size = 0;
-	free(disk->file_buf);
 }

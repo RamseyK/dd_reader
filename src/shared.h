@@ -43,5 +43,6 @@ void print_ascii(unsigned char *buf, size_t len);
 void print_hex(unsigned char *buf, size_t len);
 void print_hex2(unsigned char *buf, size_t len);
 char *new_string(const char *str);
+char *get_partition_str(uint8_t type);
 
 #endif

@@ -24,6 +24,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/stat.h>
 
 // Default number of bytes to allocate in the backing buffer if no size is provided
 #define BB_DEFAULT_SIZE 4096
@@ -39,6 +40,7 @@ typedef struct byte_buffer_t {
 byte_buffer *bb_new_wrap(uint8_t *buf, size_t len);
 byte_buffer *bb_new_copy(uint8_t *buf, size_t len);
 byte_buffer *bb_new(size_t len);
+byte_buffer *bb_new_from_file(const char *path, const char *fopen_opts, bool wrap);
 byte_buffer *bb_new_default();
 bool bb_resize(byte_buffer* bb, size_t new_len);
 void bb_free(byte_buffer *bb);

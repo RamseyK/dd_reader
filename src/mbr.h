@@ -56,7 +56,6 @@ typedef struct mbr_t {
 
 mbr *mbr_new();
 void mbr_free(mbr *m);
-char *mbr_get_partition_str(uint8_t type);
 void mbr_read(byte_buffer *bb, mbr *m);
 void mbr_write(byte_buffer *bb, mbr *m);
 void mbr_print(mbr *m, bool verbose);

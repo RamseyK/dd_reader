@@ -19,8 +19,6 @@
 #ifndef _DISK_H_
 #define _DISK_H_
 
-#include <sys/stat.h>
-
 #include "bytebuffer.h"
 #include "fat.h"
 #include "mbr.h"
@@ -32,12 +30,11 @@
  * Disk state structure
  */
 typedef struct disk_img_t {
-	uint8_t *file_buf;
-	size_t file_size;
 	byte_buffer *buffer;
 
 	// Disk Data structures
 	mbr *master_boot_record;
+   //gpt *guid_table;
 	void *partition[4];
 } disk_img;
 

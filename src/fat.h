@@ -19,6 +19,8 @@
 #ifndef _FAT_H_
 #define _FAT_H_
 
+#include <math.h>
+
 #include "bytebuffer.h"
 #include "shared.h"
 #include "mbr.h"
@@ -154,16 +156,18 @@ typedef struct fat_partition_t {
  */
 
 // Overall partition
-fat_partition *fat_new_partition(uint8_t type);
+fat_partition *fat_new_partition();
 void fat_free_partition(fat_partition *part);
 void fat_read_partition(byte_buffer *bb, fat_partition *part);
 void fat_write_partition(byte_buffer *bb, fat_partition *part);
 void fat_print_partition(fat_partition *part, bool verbose);
 
-// Location calculation helper functions
-uint32_t fat_calc_fat_end_sector(fat_partition *part);
+// Location/Size calculation helper functions
+uint32_t fat_calc_sectors_per_fat(fat_partition *part);
 uint32_t fat_calc_root_dir_size(fat_partition *part);
 uint32_t fat_calc_data_start_sector(fat_partition *part);
+uint32_t fat_calc_data_size(fat_partition *part);
+uint32_t fat_calc_count_clusters(fat_partition *part);
 
 // Reserved Sectors
 fat_bs *fat_new_boot_sector();
