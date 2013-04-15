@@ -29,8 +29,15 @@ disk_img *disk_init(const char *path) {
 	disk_img *disk = (disk_img*)malloc(sizeof(disk_img));
 	memset(disk, 0, sizeof(disk_img));
 
+	// Copy the path
+	disk->file_path = new_string(path);
+
+	// Extract the image name (ex: /documents/testimage1.img. image_name = testimage1.img)
+	char *lastSlash = strrchr(disk->file_path, '/');
+	disk->image_name = lastSlash ? new_string(lastSlash+1) : new_string(disk->file_path);
+
 	// Wrap a byte buffer around the disk image buffer
-	disk->buffer = bb_new_from_file(path, "rb", true);
+	disk->buffer = bb_new_from_file(disk->file_path, "rb");
 
 	return disk;
 }
@@ -39,7 +46,7 @@ disk_img *disk_init(const char *path) {
  * Generate a SHA1 hash of the contents of the open disk image and output the hash to a file
  *
  * @param disk Disk Image state structure
- * @param out_path File Path to output the SHA1 hash as plain text
+ * @param out_path File Path to output the SHA1 hash as plain text. If NULL, do not output to a file
  */
 void disk_output_sha1(disk_img *disk, const char *out_path) {
 	SHA1Context ctx;
@@ -52,10 +59,15 @@ void disk_output_sha1(disk_img *disk, const char *out_path) {
 
 	// Output to screen
 	printf("SHA1: ");
-	print_hex2((uint8_t*)ctx.Message_Digest, 5);
+	for(int i = 0; i < 5; i++) {
+		printf("%02x", ctx.Message_Digest[i]);
+	}
 	printf("\n");
 
 	// Output to file
+	if(out_path == NULL)
+		return;
+
 	FILE *fp = fopen(out_path, "w+");
 	if(fp == NULL) {
 		printf("Could not open file %s to write sha1 hash\n", out_path);
@@ -68,13 +80,15 @@ void disk_output_sha1(disk_img *disk, const char *out_path) {
 	}
 
 	fclose(fp);
+
+	printf("Wrote SHA1 hash to %s\n", out_path);
 }
 
 /*
  * Generate a MD5 hash of the contents of the open disk image and output the hash to a file
  *
  * @param disk Disk Image state structure
- * @param out_path File Path to output the MD5 hash as plain text
+ * @param out_path File Path to output the MD5 hash as plain text. If NULL, do not output to a file
  */
 void disk_output_md5(disk_img *disk, const char *out_path) {
 	unsigned char digest[16];
@@ -90,7 +104,11 @@ void disk_output_md5(disk_img *disk, const char *out_path) {
 	print_hex2(digest, sizeof(digest));
 	printf("\n");
 
+
 	// Output to file
+	if(out_path == NULL)
+		return;
+
 	FILE *fp = fopen(out_path, "w+");
 	if(fp == NULL) {
 		printf("Could not open file %s to write md5 hash\n", out_path);
@@ -103,6 +121,8 @@ void disk_output_md5(disk_img *disk, const char *out_path) {
 	}
 
 	fclose(fp);
+
+	printf("Wrote MD5 hash to %s\n", out_path);
 }
 
 /*
@@ -141,11 +161,21 @@ void disk_parse(disk_img *disk) {
  * @param verbose If true, display every field in every data structure. If false, only display major elements
  */
 void disk_print(disk_img *disk, bool verbose) {
-	/*printf("CHECKSUMS\n");
+	printf("CHECKSUMS\n");
 	printf("==================================================\n");
-	disk_output_sha1("MD5.txt");
-	disk_output_md5("SHA1.txt");
-	printf("\n");*/
+	char *md5_name = (char*)malloc(strlen(disk->image_name) + 8 + 1);
+	char *sha1_name = (char*)malloc(strlen(disk->image_name) + 9 + 1);
+	strncpy(md5_name, "MD5-", 4);
+	strncat(md5_name, disk->image_name, strlen(disk->image_name));
+	strncat(md5_name, ".txt", 4);
+	strncpy(sha1_name, "SHA1-", 5);
+	strncat(sha1_name, disk->image_name, strlen(disk->image_name));
+	strncat(sha1_name, ".txt", 4);
+	disk_output_sha1(disk, sha1_name);
+	disk_output_md5(disk, md5_name);
+	free(md5_name);
+	free(sha1_name);
+	printf("\n");
 
 	printf("MBR ANALYSIS\n");
 	mbr_print(disk->master_boot_record, verbose);
@@ -177,6 +207,12 @@ void disk_print(disk_img *disk, bool verbose) {
  * @param disk Disk Image state structure
  */
 void disk_destroy(disk_img *disk) {
+	if(disk->file_path != NULL)
+		free(disk->file_path);
+
+	if(disk->image_name != NULL)
+		free(disk->image_name);
+
 	if(disk->master_boot_record != NULL)
 		mbr_free(disk->master_boot_record);
 

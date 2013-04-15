@@ -30,6 +30,9 @@
  * Disk state structure
  */
 typedef struct disk_img_t {
+   char *file_path;
+   char *image_name;
+
 	byte_buffer *buffer;
 
 	// Disk Data structures

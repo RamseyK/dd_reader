@@ -36,7 +36,9 @@ void print_help() {
 int main(int argc, char **argv) {
 	int opt;
 	bool verbose = false, img_is_partition = false;
-	char *file_path = NULL, *partition_type = false;
+	char *file_path = NULL, *partition_type = NULL;
+
+	printf("dd_reader\n\n");
 
 	// Parse command line options
 	while((opt = getopt(argc, argv, "f:hp:v")) != -1) {
@@ -80,7 +82,7 @@ int main(int argc, char **argv) {
 		disk_destroy(disk);
 	} else {
 		if(strcmp(partition_type, "FAT")) {
-			byte_buffer *fat_bb = bb_new_from_file(file_path, "rb", true);
+			byte_buffer *fat_bb = bb_new_from_file(file_path, "rb");
 			fat_partition *fat_par = fat_new_partition();
 
 			fat_read_partition(fat_bb, fat_par);

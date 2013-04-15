@@ -60,7 +60,7 @@ typedef struct fat_bpb_t {
 	uint16_t sectors_per_track;
 	uint16_t num_heads;
 
-	// Count of hidden sectors preceeding the partition that contains this FAT volume
+	// # of sectors on the disk preceding the start of the volume. (before the boot sector itself) Uused in order to calculate the absolute offset to the root directory and data areas.
 	uint32_t hidden_sectors;
 
 	// FAT12/16: If total_sectors_16 is 0, this must be set. FAT32: Must be set. Total # of sectors on volume.
@@ -136,8 +136,9 @@ typedef struct fat_fsinfo_t {
  * FAT partition structure
  */
 typedef struct fat_partition_t {
-	// Not part of the actual layout. Used for identifying the type of FAT. See Partition Types in shared.h
-	uint8_t type;
+	// Not part of the actual layout
+	uint8_t type; // Used for identifying the type of FAT. See Partition Types in shared.h
+	uint32_t start_pos; // byte_buffer position that points to the beginning of the partition
 
 	// Reserved section. Size = Number of reserved sectors
 	fat_bs *boot_sector;
@@ -163,16 +164,21 @@ void fat_write_partition(byte_buffer *bb, fat_partition *part);
 void fat_print_partition(fat_partition *part, bool verbose);
 
 // Location/Size calculation helper functions
-uint32_t fat_calc_sectors_per_fat(fat_partition *part);
-uint32_t fat_calc_root_dir_size(fat_partition *part);
-uint32_t fat_calc_data_start_sector(fat_partition *part);
-uint32_t fat_calc_data_size(fat_partition *part);
-uint32_t fat_calc_count_clusters(fat_partition *part);
+uint32_t fat_sectors_per_fat(fat_partition *part);
+uint32_t fat_rootdir_size(fat_partition *part);
+uint32_t fat_rootdir_start_rel(fat_partition *part);
+uint32_t fat_rootdir_start_abs(fat_partition *part);
+uint32_t fat_data_size(fat_partition *part);
+uint32_t fat_data_start_rel(fat_partition *part);
+uint32_t fat_data_start_abs(fat_partition *part);
+uint32_t fat_count_clusters(fat_partition *part);
+uint32_t fat_cluster_to_sector_rel(fat_partition *part, uint32_t cluster);
 
 // Reserved Sectors
 fat_bs *fat_new_boot_sector();
 void fat_free_boot_sector(fat_bs *bs);
 void fat_read_boot_sector(byte_buffer *bb, fat_partition *part);
+void fat_read_backup_boot_secotr(byte_buffer *bb, fat_partition *part);
 void fat_write_boot_sector(byte_buffer *bb, fat_partition *part);
 
 fat_fsinfo *fat_new_fsinfo();

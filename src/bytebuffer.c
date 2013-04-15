@@ -48,7 +48,7 @@ byte_buffer *bb_new(size_t len) {
 	return bb;
 }
 
-byte_buffer *bb_new_from_file(const char *path, const char *fopen_opts, bool wrap) {
+byte_buffer *bb_new_from_file(const char *path, const char *fopen_opts) {
 	struct stat sb;
 	FILE *fp;
 	size_t bytes_read = 0;
@@ -80,13 +80,7 @@ byte_buffer *bb_new_from_file(const char *path, const char *fopen_opts, bool wra
 		return NULL;
 	}
 
-	if(wrap) {
-		bb = bb_new_wrap(file_buf, bytes_read);
-	} else {
-		bb = bb_new_copy(file_buf, bytes_read);
-	}
-
-	free(file_buf);
+	bb = bb_new_wrap(file_buf, bytes_read);
 
 	return bb;
 }

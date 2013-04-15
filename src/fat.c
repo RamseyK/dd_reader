@@ -39,7 +39,7 @@ void fat_free_partition(fat_partition *part) {
 
 void fat_read_partition(byte_buffer *bb, fat_partition *part) {
 	// Keep the byte address of the start of the partiton
-	int part_start_pos = bb->pos;
+	part->start_pos = bb->pos;
 
 	// Boot sector
 	fat_read_boot_sector(bb, part);
@@ -53,7 +53,7 @@ void fat_read_partition(byte_buffer *bb, fat_partition *part) {
 	}
 
 	// Move to the start of the FAT tables
-	bb->pos = part_start_pos + (part->boot_sector->bpb.reserved_sectors * part->boot_sector->bpb.bytes_per_sector);
+	bb->pos = part->start_pos + (part->boot_sector->bpb.reserved_sectors * part->boot_sector->bpb.bytes_per_sector);
 }
 
 void fat_write_partition(byte_buffer *bb, fat_partition *part) {
@@ -118,16 +118,16 @@ void fat_print_partition(fat_partition *part, bool verbose) {
 
 	printf("Reserved Area:  Start sector: %i  Ending sector: %i  Size: %i sectors\n", 0, part->boot_sector->bpb.reserved_sectors-1, part->boot_sector->bpb.reserved_sectors);
 	printf("Sectors per cluster: %i sectors\n", part->boot_sector->bpb.sectors_per_cluster);
-	printf("FAT area: Start sector: %i  Ending sector: %i\n", part->boot_sector->bpb.reserved_sectors, fat_calc_data_start_sector(part)-1);
+	printf("FAT area: Start sector: %i  Ending sector: %i\n", part->boot_sector->bpb.reserved_sectors, fat_data_start_rel(part)-fat_rootdir_size(part)-1);
 	printf("# of FATs: %i\n", part->boot_sector->bpb.num_fats);
-	printf("The size of each FAT: %i sectors\n", fat_calc_sectors_per_fat(part));
-	printf("The first sector of cluster 2: %i sectors\n", fat_calc_data_start_sector(part));
+	printf("The size of each FAT: %i sectors\n", fat_sectors_per_fat(part));
+	printf("The first sector of cluster 2: %i sectors\n", fat_data_start_abs(part));
 }
 
 // Location calculation helper functions
 
 // Return the specified sectors per fat from the BPB
-uint32_t fat_calc_sectors_per_fat(fat_partition *part) {
+uint32_t fat_sectors_per_fat(fat_partition *part) {
 	if(part->boot_sector->bpb.sectors_per_fat_f16 != 0)
 		return part->boot_sector->bpb.sectors_per_fat_f16;
 	else
@@ -135,17 +135,35 @@ uint32_t fat_calc_sectors_per_fat(fat_partition *part) {
 }
 
 // Calculate the size of the Root Directory in sectors relative to the BPB at sector 0
-uint32_t fat_calc_root_dir_size(fat_partition *part) {
-	return ceil((part->boot_sector->bpb.root_entries_f16 * 32) / part->boot_sector->bpb.bytes_per_sector);
+uint32_t fat_rootdir_size(fat_partition *part) {
+	//RootDirSectors = ((BPB_RootEntCnt * 32) + (BPB_BytsPerSec – 1)) / BPB_BytsPerSec;
+	return ceil(((part->boot_sector->bpb.root_entries_f16 * 32) + (part->boot_sector->bpb.bytes_per_sector-1)) / part->boot_sector->bpb.bytes_per_sector);
 }
 
-// Calculate the first sector of the Data Region relative to the BPB at sector 0
-uint32_t fat_calc_data_start_sector(fat_partition *part) {
-	return part->boot_sector->bpb.reserved_sectors + (fat_calc_sectors_per_fat(part) * part->boot_sector->bpb.num_fats) + fat_calc_root_dir_size(part);
+// Calculate the offset of the first sector of the Root Directory region relative to logical sector 0 (begin of vol)
+uint32_t fat_rootdir_start_rel(fat_partition *part) {
+	return part->boot_sector->bpb.reserved_sectors + (fat_sectors_per_fat(part) * part->boot_sector->bpb.num_fats);
+}
+
+// Calculate the absolute offset of the first sector of the Root Directory region
+uint32_t fat_rootdir_start_abs(fat_partition *part) {
+	return part->boot_sector->bpb.hidden_sectors + part->boot_sector->bpb.reserved_sectors + (fat_sectors_per_fat(part) * part->boot_sector->bpb.num_fats);
+}
+
+// Calculate the offset of the first sector of the Data Region relative to logical sector 0 (begin of vol)
+// This is also the first sector of cluster 2
+uint32_t fat_data_start_rel(fat_partition *part) {
+	return part->boot_sector->bpb.reserved_sectors + (fat_sectors_per_fat(part) * part->boot_sector->bpb.num_fats) + fat_rootdir_size(part);
+}
+
+// Calculate the absolute of the first sector of the Data Region relative to the start of the volume
+// This is also the first sector of cluster 2
+uint32_t fat_data_start_abs(fat_partition *part) {
+	return part->boot_sector->bpb.hidden_sectors + part->boot_sector->bpb.reserved_sectors + (fat_sectors_per_fat(part) * part->boot_sector->bpb.num_fats) + fat_rootdir_size(part);
 }
 
 // Calculate the size of the Data Region in sectors relative to the BPB at sector 0
-uint32_t fat_calc_data_size(fat_partition *part) {
+uint32_t fat_data_size(fat_partition *part) {
 	uint32_t total_sectors = 0;
 
 	if(part->boot_sector->bpb.total_sectors_16bit != 0)
@@ -153,11 +171,19 @@ uint32_t fat_calc_data_size(fat_partition *part) {
 	else
 		total_sectors = part->boot_sector->bpb.total_sectors_32bit;
 
-	return total_sectors - fat_calc_data_start_sector(part);
+	return total_sectors - fat_data_start_rel(part);
 }
 
-uint32_t fat_calc_count_clusters(fat_partition *part) {
-	return floor(fat_calc_data_size(part) / part->boot_sector->bpb.sectors_per_cluster);
+/*
+MSFT: the count of data clusters starting at cluster 2. The maximum valid cluster number for the volume is CountofClusters + 1, and the “count of clusters including the two reserved clusters” is CountofClusters + 2.
+*/
+uint32_t fat_count_clusters(fat_partition *part) {
+	return floor(fat_data_size(part) / part->boot_sector->bpb.sectors_per_cluster);
+}
+
+// Calculates the sector given the data cluster number, relative to logical sector 0 of the FAT volume
+uint32_t fat_cluster_to_sector_rel(fat_partition *part, uint32_t cluster) {
+	return ((cluster - 2) * part->boot_sector->bpb.sectors_per_cluster) + fat_data_start_rel(part);
 }
 
 // Reserved Sectors
@@ -204,7 +230,7 @@ void fat_read_boot_sector(byte_buffer *bb, fat_partition *part) {
 	bs->bpb.total_sectors_32bit = bb_get_int(bb);
 
 	// Make proper determination of the FAT partition type according to MSFT docs
-	uint32_t cluster_count = fat_calc_count_clusters(part);
+	uint32_t cluster_count = fat_count_clusters(part);
 	if(cluster_count < 4085) {
 		part->type = PT_FAT12;
 	} else if(cluster_count < 65525) {
@@ -212,7 +238,7 @@ void fat_read_boot_sector(byte_buffer *bb, fat_partition *part) {
 	} else {
 		part->type = PT_FAT32;
 	}
-	printf("Detected FAT type: %s\n", get_partition_str(part->type)); // delete this after testing
+	//printf("Detected FAT type: %s\n", get_partition_str(part->type)); // delete this after testing
 
 	// FAT32 portion of the BPB
 	if(part->type == PT_FAT32) {

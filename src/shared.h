@@ -39,9 +39,9 @@
  * Shared functions
  */
 
-void print_ascii(unsigned char *buf, size_t len);
-void print_hex(unsigned char *buf, size_t len);
-void print_hex2(unsigned char *buf, size_t len);
+void print_ascii(uint8_t *buf, size_t len);
+void print_hex(uint8_t *buf, size_t len);
+void print_hex2(uint8_t *buf, size_t len);
 char *new_string(const char *str);
 char *get_partition_str(uint8_t type);
 

@@ -7,8 +7,8 @@ BINDIR := bin
 BUILDDIR := build
 TARGET := dd_reader
 
-# GCC Debug Flags
-DEBUGFLAGS := -g3 -O0 -Wall -pg
+# GCC Debug Flags, -pg for profiling
+DEBUGFLAGS := -g3 -O0 -Wall
 RTCHECKS := -fmudflap -fstack-check -gnato
 # Production Flags
 PRODFLAGS := -Wall -O2
