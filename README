@@ -2,13 +2,20 @@ dd_reader
 Ramsey Kant
 
 dd_reader is a raw Disk Image parser that can populate and display common data structures present on physical storage media.
+Runs on GNU/Linux, FreeBSD, OS X.
 
 Supported Structures:
 MBR
 FAT12 / FAT16B / FAT32
 NTFS (work in progress)
 
-Usage:
+Make targets: all, clean
 
-License:
-See LICENSE.TXT
+License: See LICENSE.TXT
+
+Usage:
+dd_reader [OPTIONS] -f FILE
+-f      File path (required). Full path to the raw image.
+OPTIONS:
+-h      Help. Display this message
+-v      Verbose. Print out all fields for all data structures
