@@ -14,7 +14,7 @@ RTCHECKS := -fmudflap -fstack-check -gnato
 PRODFLAGS := -Wall -O2
 # Active Flags
 CFLAGS := $(DEBUGFLAGS) -std=c99
-LINK := $(DEBUGFLAGS)
+LINK := $(DEBUGFLAGS) -lm
 
 # File Paths
 SRCEXT := c

@@ -18,6 +18,7 @@
 
 #include <stdio.h>
 #include <unistd.h>
+#include <getopt.h>
 
 #include "disk.h"
 #include "mbr.h"
@@ -27,8 +28,8 @@ void print_help() {
 	printf("-f\tFile path (required). Full path to the raw image.\n");
 	printf("OPTIONS:\n");
 	printf("-h\tHelp. Display this message\n");
-	/*printf("-p TYPE\tFile is a single partition dump, do not attempt to read an MBR/GPT\n");
-	printf("\tValid Types: FAT, NTFS\n");*/
+	printf("-p TYPE\tFile is a single partition dump, do not attempt to read an MBR/GPT\n");
+	printf("\tValid Types: FAT, NTFS\n");
 	printf("-v\tVerbose. Print out all fields for all data structures\n");
 	printf("\n");
 }

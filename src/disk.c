@@ -74,7 +74,6 @@ void disk_output_sha1(disk_img *disk, const char *out_path) {
 		return;
 	}
 
-	fprintf(fp, "SHA1: ");
 	for(int i = 0; i < 5; i++) {
 		fprintf(fp, "%02x", ctx.Message_Digest[i]);
 	}
@@ -115,7 +114,6 @@ void disk_output_md5(disk_img *disk, const char *out_path) {
 		return;
 	}
 
-	fprintf(fp, "MD5: ");
 	for(int i = 0; i < sizeof(digest); i++) {
 		fprintf(fp, "%02x", digest[i]);
 	}
