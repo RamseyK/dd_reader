@@ -57,14 +57,14 @@ byte_buffer *bb_new_from_file(const char *path, const char *fopen_opts) {
 
 	// Get the size of the file
 	if(stat(path, &sb) != 0) {
-		printf("Could not get the size of the disk image file %s\n", path);
+		printf("Could not get the size of the file %s\n", path);
 		return NULL;
 	}
 
 	// Open file as read only
 	fp = fopen(path, fopen_opts);
 	if(fp == NULL) {
-		printf("Could not open disk image file %s\n", path);
+		printf("Could not open file %s\n", path);
 		return NULL;
 	}
 
